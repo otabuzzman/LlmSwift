@@ -1,0 +1,23 @@
+{
+  "pins" : [
+    {
+      "identity" : "circularbuffer",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/otabuzzman/CircularBuffer.git",
+      "state" : {
+        "revision" : "efdfe62eaefc7124ce425973da9f8b8a9629d9d3",
+        "version" : "1.0.1"
+      }
+    },
+    {
+      "identity" : "glob",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/Bouke/Glob.git",
+      "state" : {
+        "revision" : "deda6e163d2ff2a8d7e138e2c3326dbd71157faf",
+        "version" : "1.0.5"
+      }
+    }
+  ],
+  "version" : 2
+}
