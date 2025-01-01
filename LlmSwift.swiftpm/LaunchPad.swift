@@ -26,14 +26,18 @@ extension UnsafeMutableRawPointer: KernelParam {}
 extension Float: KernelParam {}
 extension Int32: KernelParam {}
 
+struct LaunchPadConfiguration {}
+
 struct LaunchPad {
+    private var configuration = LaunchPadConfiguration()
+    
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     
     private let library: MTLLibrary
     
     private var kernel = [String : MTLComputePipelineState]()
-    private var buffer = [MTLBuffer]()
+    private var buffer = [MTLBuffer?]()
     
     // transient objects
     private var command: MTLCommandBuffer? = nil
@@ -41,7 +45,9 @@ struct LaunchPad {
 }
 
 extension LaunchPad {
-    init() throws {
+    init(_ configuration: LaunchPadConfiguration? = nil) throws {
+        if let configuration = configuration { self.configuration = configuration }
+        
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw LaunchPadError.apiReturnedNil(api: "MTLCreateSystemDefaultDevice")
         }
@@ -70,30 +76,43 @@ extension LaunchPad {
         self.encoder = encoder
     }
     
-    mutating func registerKernel(name: String) throws -> Void {
+    mutating func registerKernel(name: String, _ preserve: Bool = true) throws -> Void {
+        if preserve {
+            if kernel.contains(where: { $0.0 == name }) { return }
+        }
         guard let function = library.makeFunction(name: name) else {
             throw LaunchPadError.apiReturnedNil(api: "makeFunction \(name)")
         }
         let pipeline = try device.makeComputePipelineState(function: function)
-        self.kernel[name] = pipeline
+        kernel[name] = pipeline
     }
     
-    @discardableResult
-    mutating func registerBuffer(address: UnsafeMutableRawPointer, length: Int) throws -> Int {
+    mutating func registerBuffer(address: UnsafeMutableRawPointer, length: Int, _ preserve: Bool = true) throws -> Void {
+        if preserve {
+            if let _ = try? lookupBuffer(for: address) { return }
+        }
         guard
             let buffer = device.makeBuffer(bytesNoCopy: address, length: length, options: [.storageModeShared])
         else { throw LaunchPadError.apiReturnedNil(api: "makeBuffer") }
-        self.buffer.append(buffer)
-        
-        return self.buffer.endIndex - 1
+        if let index = self.buffer.firstIndex(where: { $0 == nil }) {
+            self.buffer[index] = buffer
+        } else {
+            self.buffer.append(buffer)
+        }
+    }
+    
+    mutating func unregisterBuffer(address: UnsafeMutableRawPointer) -> Void {
+        if let (index, _) = try? lookupBuffer(for: address) { buffer[index] = nil }
     }
     
     private func lookupBuffer(for address: UnsafeMutableRawPointer) throws -> (Int, UnsafeMutableRawPointer) {
         for index in 0..<buffer.count {
-            let bufferBaseAddress = buffer[index].contents()
-            let bufferLastAddress = bufferBaseAddress + buffer[index].length
-            if (bufferBaseAddress..<bufferLastAddress).contains(address) {
-                return (index, bufferBaseAddress)
+            if let buffer = self.buffer[index] {
+                let bufferBaseAddress = buffer.contents()
+                let bufferLastAddress = bufferBaseAddress + buffer.length
+                if (bufferBaseAddress..<bufferLastAddress).contains(address) {
+                    return (index, bufferBaseAddress)
+                }
             }
         }
         throw LaunchPadError.miscellaneous(info: "no buffer found")
@@ -123,6 +142,7 @@ extension LaunchPad {
             case is Int32:
                 var scalar = param as! Int32
                 encoder?.setBytes(&scalar, length: MemoryLayout<Int32>.stride, index: index)
+                
                 index += 1
                 break
             default:

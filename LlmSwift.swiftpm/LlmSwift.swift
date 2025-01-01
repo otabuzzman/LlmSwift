@@ -30,6 +30,7 @@ struct ContentView: View {
                 longRunTask = Task { @MainActor in
                     longRunBusy = true
                     do {
+                        launchPad = try LaunchPad()
                         try await test_gpt2(appFolder, { stdlog.pushBack($0) })
                     } catch { stdlog.pushBack("Exception: \(error.localizedDescription)\n") }
                     longRunBusy = false

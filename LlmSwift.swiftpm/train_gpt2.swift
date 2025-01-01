@@ -30,7 +30,8 @@ extension LlmSwiftError: CustomStringConvertible {
 // matmul_forward_default, matmul_forward_cblas or matmul_forward_naive
 fileprivate let matmul_forward = matmul_forward_default
 
-fileprivate var launchPad: LaunchPad? 
+// Metal support (experimental)
+var launchPad: LaunchPad?
 
 // ----------------------------------------------------------------------------
 // all the individual layers' forward and backward passes
@@ -757,13 +758,18 @@ func fill_in_parameter_sizes(_ param_sizes: UnsafeMutablePointer<Int>, _ config:
 // allocate memory for the parameters and point the individual tensors to the right places
 func malloc_and_point_parameters(
     _ params: UnsafeMutablePointer<ParameterTensors>,
-    _ param_sizes: UnsafePointer<Int>) -> UnsafeMutableBufferPointer<Float> {
+    _ param_sizes: UnsafePointer<Int>,
+    _ stdlog: ((String) -> Void)?) -> UnsafeMutableBufferPointer<Float> {
     var num_parameters = 0
     for i in 0..<NUM_PARAMETER_TENSORS {
         num_parameters += param_sizes[i]
     }
     // malloc all parameters all at once (https://stackoverflow.com/a/74021402)
     let params_memory = UnsafeMutableBufferPointer<Float>.allocate(capacity: num_parameters)
+    do {
+        let params_length = num_parameters * MemoryLayout<Float>.size
+        try launchPad?.registerBuffer(address: UnsafeMutableRawPointer(params_memory.baseAddress!), length: params_length)
+    } catch { stdlog?("\(#function) caught exception : \(error)\n") }
     // assign all the tensors
     var params_memory_iterator = params_memory.baseAddress!
     // Pointer initialization in Swift
@@ -890,12 +896,19 @@ func fill_in_activation_sizes(_ act_sizes: UnsafeMutablePointer<Int>, _ config: 
 // swiftlint:disable:next function_body_length
 func malloc_and_point_activations(
     _ acts: UnsafeMutablePointer<ActivationTensors>,
-    _ act_sizes: UnsafePointer<Int>) -> UnsafeMutableBufferPointer<Float> {
+    _ act_sizes: UnsafePointer<Int>,
+    _ stdlog: ((String) -> Void)?) -> UnsafeMutableBufferPointer<Float> {
     var num_activations = 0
     for i in 0..<NUM_ACTIVATION_TENSORS {
         num_activations += act_sizes[i]
     }
     let acts_memory = UnsafeMutableBufferPointer<Float>.allocate(capacity: num_activations)
+    do {
+        try launchPad?.registerBuffer(
+            address: UnsafeMutableRawPointer(acts_memory.baseAddress!),
+            length: num_activations * MemoryLayout<Float>.size)
+    } catch { stdlog?("\(#function) caught exception : \(error)\n")}
+    
     var acts_memory_iterator = acts_memory.baseAddress!
     // Pointer initialization in Swift
     acts.pointee.encoded = acts_memory_iterator
@@ -1058,7 +1071,7 @@ func gpt2_build_from_checkpoint(
     model.pointee.num_parameters = num_parameters
 
     // read in all the parameters from file
-    let params_memory = malloc_and_point_parameters(&model.pointee.params, model.pointee.param_sizes)
+    let params_memory = malloc_and_point_parameters(&model.pointee.params, model.pointee.param_sizes, stdlog)
     let params_memory_buffer = UnsafeMutableRawBufferPointer(params_memory)
     _ = try FileDescriptor(rawValue: handle.fileDescriptor).read(into: params_memory_buffer)
     model.pointee.params_memory = params_memory.baseAddress
@@ -1083,7 +1096,7 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
     _ inputs: UnsafePointer<Int32>,
     _ targets: UnsafePointer<Int32>?,
     _ B: Int, _ T: Int, _ stdlog: ((String) -> Void)?) async throws {
-
+        
     // ensure the model was initialized or error out
     guard
         model.pointee.params_memory != nil
@@ -1117,7 +1130,7 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
         }
         stdlog?("num_activations: \(num_activations)\n")
         model.pointee.num_activations = num_activations
-        let acts_memory = malloc_and_point_activations(&model.pointee.acts, model.pointee.act_sizes)
+        let acts_memory = malloc_and_point_activations(&model.pointee.acts, model.pointee.act_sizes, stdlog)
         model.pointee.acts_memory = acts_memory.baseAddress
         // also create memory for caching inputs and targets
         model.pointee.inputs = UnsafeMutablePointer<Int32>.allocate(capacity: B * T)
@@ -1136,28 +1149,27 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
     if let targets = targets {
         model.pointee.targets!.update(from: targets, count: B * T)
     }
-        /*
-    do {
-        try launchPad = LaunchPad()
-        
-        ["encoder", "layernorm", "matmul", "attention",
-         "residual", "gelu", "softmax", "crossentropy"]
-        .forEach { layer in
-                let name = layer + "_forward"
-                do { try launchPad?.registerKernel(name: name) } catch { stdlog?("\(error)\n") }
-        }
-        
-        let params_memory = model.pointee.params_memory!
-        let params_length = model.pointee.num_parameters * MemoryLayout<Float>.size
-        try launchPad?.registerBuffer(address: params_memory, length: params_length)
-        let acts_memory = model.pointee.acts_memory!
-        let acts_length = model.pointee.num_activations * MemoryLayout<Float>.size
-        try launchPad?.registerBuffer(address: acts_memory, length: acts_length)
-        let inputs_memory = UnsafeMutableRawPointer(mutating: inputs)
-        let inputs_length = B * T * MemoryLayout<Int32>.size
-        try launchPad?.registerBuffer(address: inputs_memory, length: inputs_length)
-    } catch { stdlog?("\(error)\n") }
-        */
+
+    // register kernels (shaders)
+    let layers = [
+        "encoder",
+        "layernorm",
+        "matmul",
+        "attention",
+        "residual",
+        "gelu",
+        "softmax",
+        "crossentropy",
+    ]
+    for layer in layers {
+        try launchPad?.registerKernel(name: "\(layer)_forward")
+    }
+
+    let inputs_memory = UnsafeMutableRawPointer(mutating: inputs)
+    let inputs_length = B * T * MemoryLayout<Int32>.size
+    try launchPad?.registerBuffer(address: inputs_memory, length: inputs_length, false)
+    defer { launchPad?.unregisterBuffer(address: inputs_memory) }
+
     // forward pass
     let params = model.pointee.params // for brevity
     let acts = model.pointee.acts
@@ -1165,7 +1177,7 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
     do {
         try encoder_forward(acts.encoded, inputs, params.wte, params.wpe, B, T, C) // encoding goes into residual[0]
         try launchPad?.commit(wait: true)
-    } catch { stdlog?("\(error)\n") }
+    } catch { stdlog?("\(#function) caught exception : \(error)\n") }
     for l in 0..<L {
         try Task.checkCancellation()
         residual = l == 0 ? acts.encoded : acts.residual3 + (l - 1) * B * T * C
@@ -1221,6 +1233,10 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
 
     // also forward the cross-entropy loss function if we have the targets
     if let targets = targets {
+        let targets_memory = UnsafeMutableRawPointer(mutating: targets)
+        let targets_length = B * T * MemoryLayout<Int32>.size
+        try launchPad?.registerBuffer(address: targets_memory, length: targets_length, false)
+        defer { launchPad?.unregisterBuffer(address: targets_memory) }
         crossentropy_forward(model.pointee.acts.losses, model.pointee.acts.probs, targets, B, T, Vp)
         // for convenience also evaluate the mean loss
         var mean_loss: Float = 0
@@ -1243,7 +1259,7 @@ func gpt2_zero_grad(_ model: UnsafeMutablePointer<GPT2>) {
 }
 
 // swiftlint:disable:next function_body_length
-func gpt2_backward(_ model: UnsafeMutablePointer<GPT2>) async throws {
+func gpt2_backward(_ model: UnsafeMutablePointer<GPT2>, _ stdlog: ((String) -> Void)?) async throws {
     // double check we forwarded previously, with targets
     if model.pointee.mean_loss == -1 {
         throw LlmSwiftError.wrongApiUsage // must call gpt2_forward with `targets´ before this API
@@ -1251,9 +1267,9 @@ func gpt2_backward(_ model: UnsafeMutablePointer<GPT2>) async throws {
 
     // lazily allocate the memory for gradients of the weights and activations, if needed
     if model.pointee.grads_memory == nil {
-        let grads_memory = malloc_and_point_parameters(&model.pointee.grads, model.pointee.param_sizes)
+        let grads_memory = malloc_and_point_parameters(&model.pointee.grads, model.pointee.param_sizes, stdlog)
         model.pointee.grads_memory = grads_memory.baseAddress
-        let grads_acts_memory = malloc_and_point_activations(&model.pointee.grads_acts, model.pointee.act_sizes)
+        let grads_acts_memory = malloc_and_point_activations(&model.pointee.grads_acts, model.pointee.act_sizes, stdlog)
         model.pointee.grads_acts_memory = grads_acts_memory.baseAddress
         gpt2_zero_grad(model)
     }
@@ -1555,7 +1571,7 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
         try dataloader_next_batch(&train_loader)
         try await gpt2_forward(&model, train_loader.inputs, train_loader.targets, B, T, stdlog)
         gpt2_zero_grad(&model)
-        try await gpt2_backward(&model)
+        try await gpt2_backward(&model, stdlog)
         gpt2_update(&model, 1e-4, 0.9, 0.999, 1e-8, 0, step + 1)
         let end = Date.timeIntervalSinceReferenceDate
         stdlog?("step \(step): train loss \(model.mean_loss) (took \(String(format: "%1.2f", (end - start) * 1000)) ms)\n")
