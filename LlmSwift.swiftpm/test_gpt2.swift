@@ -84,7 +84,7 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
     stdlog?("seq_len: \(T)\n")
 
     var expected_grads = ParameterTensors()
-    let expected_grads_memory = malloc_and_point_parameters(&expected_grads, model.param_sizes, stdlog)
+    let expected_grads_memory = malloc_and_point_parameters(&expected_grads, model.param_sizes)
     let expected_grads_memory_buffer = UnsafeMutableRawBufferPointer(expected_grads_memory)
 
     defer {
@@ -130,7 +130,7 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
 
         try await gpt2_forward(&model, x.baseAddress!, y.baseAddress!, B, T, stdlog)
         gpt2_zero_grad(&model)
-        try await gpt2_backward(&model, stdlog)
+        try await gpt2_backward(&model)
 
         let end = Date.timeIntervalSinceReferenceDate
 

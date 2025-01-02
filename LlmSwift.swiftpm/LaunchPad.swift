@@ -26,11 +26,7 @@ extension UnsafeMutableRawPointer: KernelParam {}
 extension Float: KernelParam {}
 extension Int32: KernelParam {}
 
-struct LaunchPadConfiguration {}
-
 struct LaunchPad {
-    private var configuration = LaunchPadConfiguration()
-    
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     
@@ -45,9 +41,7 @@ struct LaunchPad {
 }
 
 extension LaunchPad {
-    init(_ configuration: LaunchPadConfiguration? = nil) throws {
-        if let configuration = configuration { self.configuration = configuration }
-        
+    init() throws {
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw LaunchPadError.apiReturnedNil(api: "MTLCreateSystemDefaultDevice")
         }
@@ -101,10 +95,6 @@ extension LaunchPad {
         }
     }
     
-    mutating func unregisterBuffer(address: UnsafeMutableRawPointer) -> Void {
-        if let (index, _) = try? lookupBuffer(for: address) { buffer[index] = nil }
-    }
-    
     private func lookupBuffer(for address: UnsafeMutableRawPointer) throws -> (Int, UnsafeMutableRawPointer) {
         for index in 0..<buffer.count {
             if let buffer = self.buffer[index] {
@@ -116,7 +106,7 @@ extension LaunchPad {
             }
         }
         throw LaunchPadError.miscellaneous(info: "no buffer found")
-    } 
+    }
     
     func dispatchKernel(name: String, context: KernelContext, params: [KernelParam]) throws -> Void {
         guard
@@ -142,7 +132,6 @@ extension LaunchPad {
             case is Int32:
                 var scalar = param as! Int32
                 encoder?.setBytes(&scalar, length: MemoryLayout<Int32>.stride, index: index)
-                
                 index += 1
                 break
             default:
