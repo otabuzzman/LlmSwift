@@ -95,6 +95,10 @@ extension LaunchPad {
         }
     }
     
+    mutating func unregisterBuffer(address: UnsafeMutableRawPointer) -> Void {
+        if let (index, _) = try? lookupBuffer(for: address) { buffer[index] = nil }
+    }
+    
     private func lookupBuffer(for address: UnsafeMutableRawPointer) throws -> (Int, UnsafeMutableRawPointer) {
         for index in 0..<buffer.count {
             if let buffer = self.buffer[index] {

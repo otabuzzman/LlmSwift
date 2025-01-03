@@ -18,8 +18,8 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.otabuzzman.llmswift.ios",
             teamIdentifier: "28FV44657B",
-            displayVersion: "1.1.5",
-            bundleVersion: "17",
+            displayVersion: "1.1.6",
+            bundleVersion: "18",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.yellow),
             supportedDeviceFamilies: [

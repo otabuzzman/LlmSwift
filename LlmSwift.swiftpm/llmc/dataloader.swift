@@ -180,6 +180,11 @@ func dataloader_init(_ loader: UnsafeMutablePointer<DataLoader>,
     loader.pointee.targets = UnsafeMutablePointer<Int32>.allocate(capacity: B * T)
     loader.pointee.num_tokens = ntok_total
 
+    // register inputs/targets for Metal
+    let buffer_length = B * T * MemoryLayout<Int32>.size
+    try launchPad?.registerBuffer(address: loader.pointee.inputs, length: buffer_length)
+    try launchPad?.registerBuffer(address: loader.pointee.inputs, length: buffer_length)
+
     // reset the loader, to initialize it
     try dataloader_reset(loader)
 }
@@ -224,7 +229,9 @@ func dataloader_resume(_ loader: UnsafeMutablePointer<DataLoader>, _ current_sha
 }
 
 func dataloader_free(_ loader: UnsafeMutablePointer<DataLoader>) {
+    launchPad?.unregisterBuffer(address: loader.pointee.inputs)
     loader.pointee.inputs.deallocate()
+    launchPad?.unregisterBuffer(address: loader.pointee.targets)
     loader.pointee.targets.deallocate()
     if loader.pointee.should_shuffle {
         loader.pointee.shard_indices.deallocate()

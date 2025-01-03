@@ -775,7 +775,7 @@ func malloc_and_point_parameters(
     let params_memory = UnsafeMutableBufferPointer<Float>.allocate(capacity: num_parameters)
         
     let params_length = num_parameters * MemoryLayout<Float>.size
-    _ = try? launchPad?.registerBuffer(address: params_memory.baseAddress!, length: params_length)
+    try? launchPad?.registerBuffer(address: params_memory.baseAddress!, length: params_length)
         
     // assign all the tensors
     var params_memory_iterator = params_memory.baseAddress!
@@ -911,7 +911,7 @@ func malloc_and_point_activations(
     let acts_memory = UnsafeMutableBufferPointer<Float>.allocate(capacity: num_activations)
         
     let acts_length = num_activations * MemoryLayout<Float>.size
-    _ = try? launchPad?.registerBuffer(address: acts_memory.baseAddress!, length: acts_length)
+    try? launchPad?.registerBuffer(address: acts_memory.baseAddress!, length: acts_length)
         
     var acts_memory_iterator = acts_memory.baseAddress!
     // Pointer initialization in Swift
@@ -1116,10 +1116,6 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
     // validate inputs, all indices must be in the range [0, V]
     for i in 0..<B * T {
         if !(0..<V ~= Int(inputs[i])) { throw LlmSwiftError.outOfBounds }
-        // register inputs buffer for Metal
-        let inputs_memory = UnsafeMutableRawPointer(mutating: inputs)
-        let inputs_length = B * T * MemoryLayout<Int32>.size
-        try launchPad?.registerBuffer(address: inputs_memory, length: inputs_length)
         if let targets = targets {
             if !(0..<V ~= Int(targets[i])) { throw LlmSwiftError.outOfBounds }
         }
@@ -1410,11 +1406,17 @@ func gpt2_update(
 }
 
 func gpt2_free(_ model: UnsafeMutablePointer<GPT2>) {
-    model.pointee.params_memory?.deallocate()
+    if let params_memory = model.pointee.params_memory{
+        launchPad?.unregisterBuffer(address: params_memory)
+        params_memory.deallocate()
+    }
     model.pointee.grads_memory?.deallocate()
     model.pointee.m_memory?.deallocate()
     model.pointee.v_memory?.deallocate()
-    model.pointee.acts_memory?.deallocate()
+    if let acts_memory = model.pointee.acts_memory{
+        launchPad?.unregisterBuffer(address: acts_memory)
+        acts_memory.deallocate()
+    }
     model.pointee.grads_acts_memory?.deallocate()
     model.pointee.inputs?.deallocate()
     model.pointee.targets?.deallocate()

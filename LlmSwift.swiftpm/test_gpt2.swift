@@ -108,6 +108,17 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
     let expected_loss = expected_loss_data.withUnsafeBytes { $0.load(as: Float.self) }
     try? state_file.close()
 
+    // register inputs/targets for Metal
+    let buffer_length = B * T * MemoryLayout<Int32>.size
+    let inputs_memory = UnsafeMutableRawPointer(mutating: x.baseAddress!)
+    let targets_memory = UnsafeMutableRawPointer(mutating: y.baseAddress!)
+    try launchPad?.registerBuffer(address: inputs_memory, length: buffer_length)
+    try launchPad?.registerBuffer(address: targets_memory, length: buffer_length)
+    defer {
+        launchPad?.unregisterBuffer(address: inputs_memory)
+        launchPad?.unregisterBuffer(address: targets_memory)
+    }
+
     // overall OK signal for the test
     var allok = true
 
