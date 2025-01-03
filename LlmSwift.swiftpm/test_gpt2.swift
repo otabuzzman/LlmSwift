@@ -55,7 +55,7 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
     let model_filename = "gpt2_124M.bin"
     guard
         let model_handle = FileHandle(forReadingAtPath: model_filename)
-    else { throw LlmSwiftError.apiReturnedNil }
+    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(model_filename)") }
     try gpt2_build_from_checkpoint(&model, model_handle, stdlog)
 
     let C = model.config.channels
@@ -68,10 +68,10 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
     let state_filename = "gpt2_124M_debug_state.bin"
     guard
         let state_file = FileHandle(forReadingAtPath: state_filename)
-    else { throw LlmSwiftError.apiReturnedNil }
+    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(state_filename)") }
     guard
         let header_data = try state_file.read(upToCount: 256 * MemoryLayout<Int32>.size)
-    else { throw LlmSwiftError.apiReturnedNil }
+    else { throw LlmSwiftError.apiReturnedNil(api: "read (in \(#function)") }
     let state_header = header_data.withUnsafeBytes { (state_header: UnsafeRawBufferPointer) -> [Int] in
         state_header.bindMemory(to: Int32.self).map { Int($0) }
     }
@@ -99,7 +99,7 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
         let y_data = try state_file.read(upToCount: B * T * MemoryLayout<Int32>.size),
         let expected_logits_data = try state_file.read(upToCount: B * T * V * MemoryLayout<Float>.size),
         let expected_loss_data = try state_file.read(upToCount: MemoryLayout<Float>.size)
-    else { throw LlmSwiftError.apiReturnedNil }
+    else { throw LlmSwiftError.apiReturnedNil(api: "read (in \(#function))") }
     _ = try FileDescriptor(rawValue: state_file.fileDescriptor).read(into: expected_grads_memory_buffer)
     // inputs and expected outputs, only used for error checking
     let x = x_data.withUnsafeBytes { $0.bindMemory(to: Int32.self) }

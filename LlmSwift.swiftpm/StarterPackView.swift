@@ -61,13 +61,9 @@ struct StarterPackView: View {
             }
         } message: {
             if let error = loadError?.1 {
-                let type = "Caught \(String(describing: type(of: error))) exception"
-                switch error {
-                case let error as LlmSwiftError:
-                    Text("\(type) :\n\(error.description)")
-                default: // Error
-                    Text("\(type) :\n\(error.localizedDescription)")
-                }
+                let type = String(describing: type(of: error))
+                let text = error.localizedDescription
+                Text("Caught \(type) exception:\n\(text)")
             }
         }
     }
@@ -213,7 +209,7 @@ class StarterPackViewModel: ObservableObject {
             guard
                 let url = url
             else {
-                self.lock.synchronize { itemInfo[item]?.state = .failed(LlmSwiftError.apiReturnedNil) }
+                self.lock.synchronize { itemInfo[item]?.state = .failed(LlmSwiftError.apiReturnedNil(api: "download")) }
                 return
             }
             let dst = appFolder.appending(path: item.file)

@@ -5,13 +5,13 @@ enum LaunchPadError: Error {
     case miscellaneous(info: String)
 }
 
-extension LaunchPadError {
-    var description: String {
+extension LaunchPadError: LocalizedError {
+    var errorDescription: String? {
         switch self {
         case .apiReturnedNil(let api):
-            return "API \(api) returned nil"
+            return NSLocalizedString("API \(api) returned nil", comment: "")
         case .miscellaneous(let info):
-            return "internal error: \(info)"
+            return NSLocalizedString("internal error: \(info)", comment: "")
         }
     }
 }

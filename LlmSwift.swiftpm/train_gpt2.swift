@@ -6,23 +6,23 @@ import Accelerate
 import System
 
 enum LlmSwiftError: Error {
-    case wrongApiUsage
-    case apiReturnedNil
+    case wrongApiUsage(api: String)
+    case apiReturnedNil(api: String)
     case outOfBounds
     case noSpace
 }
 
-extension LlmSwiftError: CustomStringConvertible {
-    var description: String {
+extension LlmSwiftError: LocalizedError {
+    var errorDescription: String? {
         switch self {
-        case .wrongApiUsage:
-            return "Wrong API usage"
-        case .apiReturnedNil:
-            return "API returned nil"
+        case .wrongApiUsage(let api):
+            return NSLocalizedString("Wrong \(api) API usage", comment: "")
+        case .apiReturnedNil(let api):
+            return NSLocalizedString("API \(api) returned nil", comment: "")
         case .outOfBounds:
-            return "Index out of bounds"
+            return NSLocalizedString("Index out of bounds", comment: "")
         case .noSpace:
-            return "No space left on device"
+            return NSLocalizedString("No space left on device", comment: "")
         }
     }
 }
@@ -1035,7 +1035,7 @@ func gpt2_build_from_checkpoint(
     // read in model from a checkpoint file
     guard
         let header_data = try handle.read(upToCount: 256 * MemoryLayout<Int32>.size)
-    else { throw LlmSwiftError.apiReturnedNil }
+        else { throw LlmSwiftError.apiReturnedNil(api: "read (in \(#function))") }
     let model_header = header_data.withUnsafeBytes { (header_data: UnsafeRawBufferPointer) -> [Int] in
         header_data.bindMemory(to: Int32.self).map { Int($0) }
     }
@@ -1104,7 +1104,7 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
     // ensure the model was initialized or error out
     guard
         model.pointee.params_memory != nil
-    else { throw LlmSwiftError.wrongApiUsage }
+        else { throw LlmSwiftError.wrongApiUsage(api: "\(#function)") }
 
     // convenience parameters
     let V = model.pointee.config.vocab_size
@@ -1144,7 +1144,7 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
         // validate B,T are not larger than the values used at initialisation
         // (smaller B,T are okay for inference only)
         if B > model.pointee.batch_size || T > model.pointee.seq_len {
-            throw LlmSwiftError.wrongApiUsage
+            throw LlmSwiftError.wrongApiUsage(api: "\(#function)")
         }
     }
 
@@ -1258,7 +1258,7 @@ func gpt2_zero_grad(_ model: UnsafeMutablePointer<GPT2>) {
 func gpt2_backward(_ model: UnsafeMutablePointer<GPT2>) async throws {
     // double check we forwarded previously, with targets
     if model.pointee.mean_loss == -1 {
-        throw LlmSwiftError.wrongApiUsage // must call gpt2_forward with `targets´ before this API
+        throw LlmSwiftError.wrongApiUsage(api: "\(#function)") // must call gpt2_forward with `targets´ before this API
     }
 
     // lazily allocate the memory for gradients of the weights and activations, if needed
@@ -1467,7 +1467,7 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     let model_filename = "gpt2_124M.bin"
     guard
         let model_handle = FileHandle(forReadingAtPath: model_filename)
-    else { throw LlmSwiftError.apiReturnedNil }
+    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(model_filename)") }
     try gpt2_build_from_checkpoint(&model, model_handle, stdlog)
 
     // build the DataLoaders from tokens files. for now use tiny_shakespeare if available, else tiny_stories
@@ -1492,7 +1492,7 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     let tokenizer_filename = "gpt2_tokenizer.bin"
     guard
         let tokenizer_handle = FileHandle(forReadingAtPath: tokenizer_filename)
-    else { throw LlmSwiftError.apiReturnedNil }
+    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(tokenizer_filename)") }
     try tokenizer_init(&tokenizer, tokenizer_handle)
 
     // some memory for generating samples from the model
