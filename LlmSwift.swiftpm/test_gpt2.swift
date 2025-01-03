@@ -53,9 +53,7 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
     // build the GPT-2 model from a checkpoint
     var model = GPT2()
     let model_filename = "gpt2_124M.bin"
-    guard
-        let model_handle = FileHandle(forReadingAtPath: model_filename)
-    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(model_filename)") }
+    let model_handle = try FileHandle(forReadingFrom: URL(string: model_filename)!)
     try gpt2_build_from_checkpoint(&model, model_handle, stdlog)
 
     let C = model.config.channels
@@ -66,9 +64,7 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
 
     // load additional information that we will use for debugging and error checking
     let state_filename = "gpt2_124M_debug_state.bin"
-    guard
-        let state_file = FileHandle(forReadingAtPath: state_filename)
-    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(state_filename)") }
+    let state_file = try FileHandle(forReadingFrom: URL(string: state_filename)!)
     guard
         let header_data = try state_file.read(upToCount: 256 * MemoryLayout<Int32>.size)
     else { throw LlmSwiftError.apiReturnedNil(api: "read (in \(#function)") }

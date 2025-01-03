@@ -1465,9 +1465,7 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     // build the GPT-2 model from a checkpoint
     var model = GPT2()
     let model_filename = "gpt2_124M.bin"
-    guard
-        let model_handle = FileHandle(forReadingAtPath: model_filename)
-    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(model_filename)") }
+    let model_handle = try FileHandle(forReadingFrom: URL(string: model_filename)!)
     try gpt2_build_from_checkpoint(&model, model_handle, stdlog)
 
     // build the DataLoaders from tokens files. for now use tiny_shakespeare if available, else tiny_stories
@@ -1490,9 +1488,7 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     // build the Tokenizer
     var tokenizer = Tokenizer()
     let tokenizer_filename = "gpt2_tokenizer.bin"
-    guard
-        let tokenizer_handle = FileHandle(forReadingAtPath: tokenizer_filename)
-    else { throw LlmSwiftError.apiReturnedNil(api: "FileHandle \(tokenizer_filename)") }
+    let tokenizer_handle = try FileHandle(forReadingFrom: URL(string: tokenizer_filename)!)
     try tokenizer_init(&tokenizer, tokenizer_handle)
 
     // some memory for generating samples from the model
