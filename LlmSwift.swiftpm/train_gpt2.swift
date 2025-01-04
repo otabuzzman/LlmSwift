@@ -43,7 +43,7 @@ func encoder_forward(
     _ inp: UnsafePointer<Int32>,
     _ wte: UnsafePointer<Float>,
     _ wpe: UnsafePointer<Float>,
-    _ B: Int, _ T: Int, _ C: Int) {
+    _ B: Int, _ T: Int, _ C: Int) throws {
     // out is (B,T,C). At each position (b,t), a C-dimensional vector summarizing token & position
     // inp is (B,T) of integers, holding the token ids at each (b,t) position
     // wte is (V,C) of token embeddings, short for "weight token embeddings"
@@ -58,14 +58,11 @@ func encoder_forward(
             UnsafeMutableRawPointer(mutating: wte),
             UnsafeMutableRawPointer(mutating: wpe),
             Int32(B), Int32(T), Int32(C)]
-        do {
-            try launchPad.dispatchKernel(
+        try launchPad.dispatchKernel(
                 name: "encoder_forward",
                 context: context,
                 params: params)
-            print("ok")
-            return
-        } catch { print("notok") }
+        return
     }
     for b in 0..<B {
         for t in 0..<T {
@@ -1154,7 +1151,6 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
         model.pointee.targets!.update(from: targets, count: B * T)
     }
 
-    // register layer kernels (shader) for Metal
     let layers = [
         "encoder",
         "layernorm",
@@ -1167,6 +1163,7 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
     ]
     for layer in layers {
         do {
+            // register layer kernels (shader) for Metal if available
             try launchPad?.registerKernel(name: "\(layer)_forward")
         } catch { stdlog?("\(error)\n") }
     }
@@ -1176,7 +1173,7 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
     let acts = model.pointee.acts
     var residual: UnsafeMutablePointer<Float>
 
-    encoder_forward(acts.encoded, inputs, params.wte, params.wpe, B, T, C) // encoding goes into residual[0]
+    try encoder_forward(acts.encoded, inputs, params.wte, params.wpe, B, T, C) // encoding goes into residual[0]
     try launchPad?.commit(wait: true)
     for l in 0..<L {
         try Task.checkCancellation()

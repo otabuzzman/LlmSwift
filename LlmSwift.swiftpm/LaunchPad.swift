@@ -26,7 +26,11 @@ extension UnsafeMutableRawPointer: KernelParam {}
 extension Float: KernelParam {}
 extension Int32: KernelParam {}
 
+struct LaunchPadDescriptor {}
+
 struct LaunchPad {
+    private var descriptor = LaunchPadDescriptor()
+    
     private let device: MTLDevice
     private let queue: MTLCommandQueue
     
@@ -41,7 +45,9 @@ struct LaunchPad {
 }
 
 extension LaunchPad {
-    init() throws {
+    init(descriptor: LaunchPadDescriptor? = nil) throws {
+        if let descriptor = descriptor { self.descriptor = descriptor }
+        
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw LaunchPadError.apiReturnedNil(api: "MTLCreateSystemDefaultDevice")
         }
