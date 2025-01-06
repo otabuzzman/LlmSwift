@@ -197,31 +197,31 @@ class StarterPackViewModel: ObservableObject {
             let systemFreeSize = attributesOfFileSystem[.systemFreeSize] as? Int
         else { return }
         if item.size > systemFreeSize {
-            self.lock.synchronize { itemInfo[item]?.state = .failed(LlmSwiftError.noSpace) }
+            itemInfo[item]?.state = .failed(LlmSwiftError.noSpace)
             return
         }
-        lock.synchronize { itemInfo[item]?.state = .loading }
+        itemInfo[item]?.state = .loading
         downloadHandler.download(url: item.remote) { [self] url, error in
             if let error = error {
-                self.lock.synchronize { itemInfo[item]?.state = .failed(error) }
+                Task { @MainActor in itemInfo[item]?.state = .failed(error) }
                 return
             }
             guard
                 let url = url
             else {
-                self.lock.synchronize { itemInfo[item]?.state = .failed(LlmSwiftError.apiReturnedNil(api: "download")) }
+                Task { @MainActor in itemInfo[item]?.state = .failed(LlmSwiftError.apiReturnedNil(api: "download")) }
                 return
             }
             let dst = appFolder.appending(path: item.file)
             try? FileManager.default.moveItem(at: url, to: dst, withIntermediateDirectories: true)
-            Task {
+            Task { @MainActor in
                 try await Task.sleep(nanoseconds: 1_000_000_000)
-                self.lock.synchronize { itemInfo[item]?.state = .loaded }
+                itemInfo[item]?.state = .loaded
                 nulItemsMissing = count == 5
                 oneItemsMissing = count == 4
             }
         } progress: { [self] progress in
-            self.lock.synchronize { self.itemInfo[item]?.progress = progress }
+            Task { @MainActor in itemInfo[item]?.progress = progress }
         }
     }
     
