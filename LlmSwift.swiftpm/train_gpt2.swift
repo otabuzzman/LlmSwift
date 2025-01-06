@@ -1491,9 +1491,16 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     // some memory for generating samples from the model
     let rng_state = UnsafeMutablePointer<UInt64>.allocate(capacity: 1)
     let gen_tokens = UnsafeMutablePointer<Int32>.allocate(capacity: B * T)
+    
+    // register buffer for Metal
+    let gen_tokens_length = B * T * MemoryLayout<Int32>.size
+    let gen_tokens_memory = UnsafeMutableRawPointer(mutating: gen_tokens)
+    try launchPad?.registerBuffer(address: gen_tokens_memory, length: gen_tokens_length)
+    
     defer {
         // free on leaving
         rng_state.deallocate()
+        launchPad?.unregisterBuffer(address: gen_tokens_memory)
         gen_tokens.deallocate()
     
         dataloader_free(&train_loader)
