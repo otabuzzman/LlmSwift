@@ -30,24 +30,24 @@ struct LaunchPadDescriptor {}
 
 struct LaunchPad {
     private var descriptor = LaunchPadDescriptor()
-    
+
     private let device: MTLDevice
     private let queue: MTLCommandQueue
-    
+
     private let library: MTLLibrary
-    
-    private var kernel = [String : MTLComputePipelineState]()
+
+    private var kernel = [String: MTLComputePipelineState]()
     private var buffer = [MTLBuffer?]()
-    
+
     // transient objects
-    private var command: MTLCommandBuffer? = nil
-    private var encoder: MTLComputeCommandEncoder? = nil
+    private var command: MTLCommandBuffer?
+    private var encoder: MTLComputeCommandEncoder?
 }
 
 extension LaunchPad {
     init(descriptor: LaunchPadDescriptor? = nil) throws {
         if let descriptor = descriptor { self.descriptor = descriptor }
-        
+
         guard let device = MTLCreateSystemDefaultDevice() else {
             throw LaunchPadError.apiReturnedNil(api: "MTLCreateSystemDefaultDevice")
         }
@@ -61,11 +61,11 @@ extension LaunchPad {
             throw LaunchPadError.apiReturnedNil(api: "makeDefaultLibrary")
         }
         self.library = library
-        
+
         try makeTransientObjects()
     }
-    
-    private mutating func makeTransientObjects() throws -> Void {
+
+    private mutating func makeTransientObjects() throws {
         guard let command = queue.makeCommandBuffer() else {
             throw LaunchPadError.apiReturnedNil(api: "makeCommandBuffer")
         }
@@ -75,8 +75,8 @@ extension LaunchPad {
         }
         self.encoder = encoder
     }
-    
-    mutating func registerKernel(name: String, _ preserve: Bool = true) throws -> Void {
+
+    mutating func registerKernel(name: String, _ preserve: Bool = true) throws {
         if preserve {
             if kernel.contains(where: { $0.0 == name }) { return }
         }
@@ -86,10 +86,10 @@ extension LaunchPad {
         let pipeline = try device.makeComputePipelineState(function: function)
         kernel[name] = pipeline
     }
-    
-    mutating func registerBuffer(address: UnsafeMutableRawPointer, length: Int, _ preserve: Bool = true) throws -> Void {
+
+    mutating func registerBuffer(address: UnsafeMutableRawPointer, length: Int, _ preserve: Bool = true) throws {
         if preserve {
-            if let _ = try? lookupBuffer(for: address) { return }
+            if (try? lookupBuffer(for: address)) != nil { return }
         }
         guard
             let buffer = device.makeBuffer(bytesNoCopy: address, length: length, options: [.storageModeShared])
@@ -100,11 +100,11 @@ extension LaunchPad {
             self.buffer.append(buffer)
         }
     }
-    
-    mutating func unregisterBuffer(address: UnsafeMutableRawPointer) -> Void {
+
+    mutating func unregisterBuffer(address: UnsafeMutableRawPointer) {
         if let (index, _) = try? lookupBuffer(for: address) { buffer[index] = nil }
     }
-    
+
     private func lookupBuffer(for address: UnsafeMutableRawPointer) throws -> (Int, UnsafeMutableRawPointer) {
         for index in 0..<buffer.count {
             if let buffer = self.buffer[index] {
@@ -117,47 +117,44 @@ extension LaunchPad {
         }
         throw LaunchPadError.miscellaneous(info: "no buffer found")
     }
-    
-    func dispatchKernel(name: String, context: KernelContext, params: [KernelParam]) throws -> Void {
+
+    func dispatchKernel(name: String, context: KernelContext, params: [KernelParam]) throws {
         guard
             let kernel = self.kernel[name]
         else { throw LaunchPadError.miscellaneous(info: "kernel \(name) not registered") }
         encoder?.setComputePipelineState(kernel)
-        
+
         var index = 0
         for param in params {
             switch param {
             case is UnsafeMutableRawPointer:
-                let address = param as! UnsafeMutableRawPointer
+                let address = (param as? UnsafeMutableRawPointer)!
                 let (bufferIndex, bufferAddress) = try lookupBuffer(for: address)
                 let offset = address - bufferAddress
                 encoder?.setBuffer(buffer[bufferIndex], offset: offset, index: index)
                 index += 1
-                break
             case is Float:
-                var scalar = param as! Float
+                var scalar = (param as? Float)!
                 encoder?.setBytes(&scalar, length: MemoryLayout<Float>.stride, index: index)
                 index += 1
-                break
             case is Int32:
-                var scalar = param as! Int32
+                var scalar = (param as? Int32)!
                 encoder?.setBytes(&scalar, length: MemoryLayout<Int32>.stride, index: index)
                 index += 1
-                break
             default:
                 break
             }
         }
-        
+
         encoder?.dispatchThreadgroups(context.threadsPerGrid, threadsPerThreadgroup: context.threadsPerGroup)
     }
-    
-    mutating func commit(wait: Bool = false) throws -> Void {
+
+    mutating func commit(wait: Bool = false) throws {
         encoder?.endEncoding()
-        
+
         command?.commit()
         if wait { command?.waitUntilCompleted() }
-        
+
         try makeTransientObjects()
     }
 }

@@ -28,10 +28,10 @@ extension LlmSwiftError: LocalizedError {
 }
 
 // matmul_forward_default, matmul_forward_cblas or matmul_forward_naive
-fileprivate let matmul_forward = matmul_forward_default
+private let matmul_forward = matmul_forward_default
 
 // metal support
-var launchPad: LaunchPad? 
+var launchPad: LaunchPad?
 
 // ----------------------------------------------------------------------------
 // all the individual layers' forward and backward passes
@@ -770,10 +770,10 @@ func malloc_and_point_parameters(
     }
     // malloc all parameters all at once (https://stackoverflow.com/a/74021402)
     let params_memory = UnsafeMutableBufferPointer<Float>.allocate(capacity: num_parameters)
-        
+
     let params_length = num_parameters * MemoryLayout<Float>.size
     try? launchPad?.registerBuffer(address: params_memory.baseAddress!, length: params_length)
-        
+
     // assign all the tensors
     var params_memory_iterator = params_memory.baseAddress!
     // Pointer initialization in Swift
@@ -809,7 +809,7 @@ func malloc_and_point_parameters(
     params_memory_iterator += param_sizes[14]
     params.pointee.lnfb = params_memory_iterator
     params_memory_iterator += param_sizes[15]
-/*    
+/*
  A 1:1 port of the C implementation for pointer initialization.
  Quite verbose in Swift and also far too difficult to read and understand.
     let ptrs: [UnsafeMutablePointer<UnsafeMutablePointer<Float>>] = [
@@ -906,10 +906,10 @@ func malloc_and_point_activations(
         num_activations += act_sizes[i]
     }
     let acts_memory = UnsafeMutableBufferPointer<Float>.allocate(capacity: num_activations)
-        
+
     let acts_length = num_activations * MemoryLayout<Float>.size
     try? launchPad?.registerBuffer(address: acts_memory.baseAddress!, length: acts_length)
-        
+
     var acts_memory_iterator = acts_memory.baseAddress!
     // Pointer initialization in Swift
     acts.pointee.encoded = acts_memory_iterator
@@ -1159,13 +1159,13 @@ func gpt2_forward( // swiftlint:disable:this function_body_length
         "residual",
         "gelu",
         "softmax",
-        "crossentropy",
+        "crossentropy"
     ]
     for layer in layers {
         do {
             // register layer kernels (shader) for Metal if available
             try launchPad?.registerKernel(name: "\(layer)_forward")
-        } catch { stdlog?("\(error)\n") }
+        } catch { stdlog?("\(error.localizedDescription)\n") }
     }
 
     // forward pass
@@ -1403,14 +1403,14 @@ func gpt2_update(
 }
 
 func gpt2_free(_ model: UnsafeMutablePointer<GPT2>) {
-    if let params_memory = model.pointee.params_memory{
+    if let params_memory = model.pointee.params_memory {
         launchPad?.unregisterBuffer(address: params_memory)
         params_memory.deallocate()
     }
     model.pointee.grads_memory?.deallocate()
     model.pointee.m_memory?.deallocate()
     model.pointee.v_memory?.deallocate()
-    if let acts_memory = model.pointee.acts_memory{
+    if let acts_memory = model.pointee.acts_memory {
         launchPad?.unregisterBuffer(address: acts_memory)
         acts_memory.deallocate()
     }
@@ -1458,7 +1458,7 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     if let folder = folder {
         FileManager.default.changeCurrentDirectoryPath(folder.path)
     }
-    
+
     // build the GPT-2 model from a checkpoint
     var model = GPT2()
     let model_filename = "gpt2_124M.bin"
@@ -1481,7 +1481,7 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     stdlog?("train dataset num_batches: \(train_loader.num_tokens / (B * T))\n")
     stdlog?("val dataset num_batches: \(val_loader.num_tokens / (B * T))\n")
     let val_num_batches = 5
-    
+
     // build the Tokenizer
     var tokenizer = Tokenizer()
     let tokenizer_filename = "gpt2_tokenizer.bin"
@@ -1491,18 +1491,18 @@ func train_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throw
     // some memory for generating samples from the model
     let rng_state = UnsafeMutablePointer<UInt64>.allocate(capacity: 1)
     let gen_tokens = UnsafeMutablePointer<Int32>.allocate(capacity: B * T)
-    
+
     // register buffer for Metal
     let gen_tokens_length = B * T * MemoryLayout<Int32>.size
     let gen_tokens_memory = UnsafeMutableRawPointer(mutating: gen_tokens)
     try launchPad?.registerBuffer(address: gen_tokens_memory, length: gen_tokens_length)
-    
+
     defer {
         // free on leaving
         rng_state.deallocate()
         launchPad?.unregisterBuffer(address: gen_tokens_memory)
         gen_tokens.deallocate()
-    
+
         dataloader_free(&train_loader)
         dataloader_free(&val_loader)
         tokenizer_free(&tokenizer)

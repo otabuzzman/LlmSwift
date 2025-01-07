@@ -86,9 +86,9 @@ func test_gpt2(_ folder: URL?, _ stdlog: ((String) -> Void)? = nil) async throws
     defer {
         // free on leaving
         expected_grads_memory.deallocate()
-        gpt2_free(&model)        
+        gpt2_free(&model)
     }
-    
+
     // read reference information from Python
     guard
         let x_data = try state_file.read(upToCount: B * T * MemoryLayout<Int32>.size),

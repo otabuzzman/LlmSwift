@@ -18,8 +18,8 @@ let package = Package(
             targets: ["AppModule"],
             bundleIdentifier: "com.otabuzzman.llmswift.ios",
             teamIdentifier: "28FV44657B",
-            displayVersion: "1.1.12",
-            bundleVersion: "24",
+            displayVersion: "1.1.14",
+            bundleVersion: "26",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.yellow),
             supportedDeviceFamilies: [
@@ -36,15 +36,15 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/Bouke/Glob.git", "1.0.5"..<"2.0.0"),
-        .package(url: "https://github.com/otabuzzman/CircularBuffer.git", "1.0.1"..<"2.0.0")
+        .package(url: "https://github.com/otabuzzman/CircularBuffer.git", "1.0.1"..<"2.0.0"),
+        .package(url: "https://github.com/Bouke/Glob.git", "1.0.5"..<"2.0.0")
     ],
     targets: [
         .executableTarget(
             name: "AppModule",
             dependencies: [
-                .product(name: "Glob", package: "Glob"),
-                .product(name: "CircularBuffer", package: "CircularBuffer")
+                .product(name: "CircularBuffer", package: "CircularBuffer"),
+                .product(name: "Glob", package: "Glob")
             ],
             path: ".",
             swiftSettings: [
