@@ -1,4 +1,5 @@
 import SwiftUI
+import LlmDotSwift
 
 struct StarterPackView: View {
     @Binding var ready: Bool
@@ -197,7 +198,7 @@ class StarterPackViewModel: ObservableObject {
             let systemFreeSize = attributesOfFileSystem[.systemFreeSize] as? Int
         else { return }
         if item.size > systemFreeSize {
-            itemInfo[item]?.state = .failed(LlmSwiftError.noSpace)
+            itemInfo[item]?.state = .failed(LlmDotSwiftError.noSpace)
             return
         }
         itemInfo[item]?.state = .loading
@@ -209,7 +210,7 @@ class StarterPackViewModel: ObservableObject {
             guard
                 let url = url
             else {
-                Task { @MainActor in itemInfo[item]?.state = .failed(LlmSwiftError.apiReturnedNil(api: "download")) }
+                Task { @MainActor in itemInfo[item]?.state = .failed(LlmDotSwiftError.apiReturnedNil(api: "download")) }
                 return
             }
             let dst = appFolder.appending(path: item.file)

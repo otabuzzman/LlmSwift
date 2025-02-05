@@ -10,16 +10,14 @@ import AppleProductTypes
 let package = Package(
     name: "LlmSwift",
     platforms: [
-        .iOS("17.4")
+        .iOS("18.1")
     ],
     products: [
         .iOSApplication(
             name: "LlmSwift",
             targets: ["AppModule"],
-            bundleIdentifier: "com.otabuzzman.llmswift.ios",
-            teamIdentifier: "28FV44657B",
-            displayVersion: "1.1.15",
-            bundleVersion: "27",
+            displayVersion: "1.0",
+            bundleVersion: "1",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.yellow),
             supportedDeviceFamilies: [
@@ -31,20 +29,19 @@ let package = Package(
                 .landscapeRight,
                 .landscapeLeft,
                 .portraitUpsideDown(.when(deviceFamilies: [.pad]))
-            ],
-            appCategory: .education
+            ]
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/otabuzzman/CircularBuffer.git", "1.0.1"..<"2.0.0"),
-        .package(url: "https://github.com/Bouke/Glob.git", "1.0.5"..<"2.0.0")
+        .package(url: "https://github.com/otabuzzman/llm.swift", "1.2.11"..<"2.0.0"),
+        .package(url: "https://github.com/otabuzzman/CircularBuffer", "1.0.1"..<"2.0.0")
     ],
     targets: [
         .executableTarget(
             name: "AppModule",
             dependencies: [
-                .product(name: "CircularBuffer", package: "CircularBuffer"),
-                .product(name: "Glob", package: "Glob")
+                .product(name: "LlmDotSwift", package: "llm.swift"),
+                .product(name: "CircularBuffer", package: "CircularBuffer")
             ],
             path: ".",
             swiftSettings: [

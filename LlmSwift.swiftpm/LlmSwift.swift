@@ -1,5 +1,6 @@
 import SwiftUI
 import CircularBuffer
+import LlmDotSwift
 
 let appFolder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
 
