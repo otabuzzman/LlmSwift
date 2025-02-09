@@ -3,10 +3,10 @@
     {
       "identity" : "circularbuffer",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/otabuzzman/CircularBuffer",
+      "location" : "https://github.com/otabuzzman/CircularBuffer.git",
       "state" : {
-        "revision" : "efdfe62eaefc7124ce425973da9f8b8a9629d9d3",
-        "version" : "1.0.1"
+        "revision" : "74501d07ba9e9c679e62525817477b62c83e227f",
+        "version" : "1.0.2"
       }
     },
     {
@@ -21,10 +21,10 @@
     {
       "identity" : "llm.swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/otabuzzman/llm.swift",
+      "location" : "https://github.com/otabuzzman/llm.swift.git",
       "state" : {
-        "revision" : "f28bc821fe53216b14016e8680461bd1d361a768",
-        "version" : "1.2.11"
+        "revision" : "51490194620398e4b81b30bd67581a54fe8e95d7",
+        "version" : "1.2.12"
       }
     }
   ],

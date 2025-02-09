@@ -16,8 +16,10 @@ let package = Package(
         .iOSApplication(
             name: "LlmSwift",
             targets: ["AppModule"],
-            displayVersion: "1.0",
-            bundleVersion: "1",
+            bundleIdentifier: "com.otabuzzman.llmswift.ios",
+            teamIdentifier: "28FV44657B",
+            displayVersion: "1.2.0",
+            bundleVersion: "29",
             appIcon: .asset("AppIcon"),
             accentColor: .presetColor(.yellow),
             supportedDeviceFamilies: [
@@ -33,8 +35,8 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(url: "https://github.com/otabuzzman/llm.swift", "1.2.11"..<"2.0.0"),
-        .package(url: "https://github.com/otabuzzman/CircularBuffer", "1.0.1"..<"2.0.0")
+        .package(url: "https://github.com/otabuzzman/llm.swift.git", "1.2.11"..<"2.0.0"),
+        .package(url: "https://github.com/otabuzzman/CircularBuffer.git", "1.0.1"..<"2.0.0")
     ],
     targets: [
         .executableTarget(
