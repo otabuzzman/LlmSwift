@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/otabuzzman/CircularBuffer.git",
       "state" : {
-        "revision" : "74501d07ba9e9c679e62525817477b62c83e227f",
-        "version" : "1.0.2"
+        "revision" : "efdfe62eaefc7124ce425973da9f8b8a9629d9d3",
+        "version" : "1.0.1"
       }
     },
     {
